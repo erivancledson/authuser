@@ -1,0 +1,63 @@
+server:
+  port: 8087
+  servlet:  #predicates do gateway
+    context-path: '/ead-authuser/'
+spring:
+  application:
+    name: ead-authuser-service #nome que vai ser visto no eureka
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ead-authuser-v2
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+      dialect: org.hibernate.dialect.PostgreSQLDialect
+      jdbc:
+       lob.non-contextual-creation: true
+    properties:
+      hibernate:
+        show_sql: true
+  output:
+    ansi:
+      enabled: Always
+  rabbitmq:
+    addresses: amqps://ecxjwsmx:zgwxqhWeA6tn8XkkhVVMQyKX0w7qfvxj@woodpecker.rmq.cloudamqp.com/ecxjwsmx
+
+logging:
+  level:
+    com.ead: TRACE
+    root: INFO
+    org.springframework.web: DEBUG
+    org.hibernate: INFO
+
+ead:
+  api:
+    url: #name eureka do course
+      course: 'http://ead-course-service/ead-course'
+  broker:
+    exchange:
+      userEvent: ead.userevent #exchange da mensageria
+
+eureka: #configuracoes do eureka
+  client:
+    service-url:
+      defaultZone: 'http://localhost:8761/eureka'
+  instance:
+    hostname: localhost
+
+resilience4j:
+    circuitbreaker:
+      instances:
+        circuitbreakerInstance:
+          slidingWindowSize: 30 #periodo de 30 segundos ele vai analizar se a chamada foram com resultado ok ou teve falha
+          permittedNumberOfCallsInHalfOpenState: 2 # 2 solicitações vai ficar no estado meio aberto, analisando para ver se o ms está apresentando falha
+          slidingWindowType: TIME_BASED #baseado na janela em tempo
+          minimumNumberOfCalls: 2 # limite de 2 chamadas e muda o estado para aberto
+          waitDurationInOpenState: 30s #limita em 30 segundos para que não seja bombardeado por outros microserviços. Devolve um erro , impede sobrecarga do serviço. Estado fechado o circuito funciona normal. Depois de 30 segundos ele passa para o estado meio aberto
+          failureRateThreshold: 80 #taxa de falha 80%
+    retry:
+      instances:
+        retryInstance:
+         maxAttempts: 3  #3 tentantiva
+         waitDuration: 5s   #5 segundos para ele tentar a proxima
