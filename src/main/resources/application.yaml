@@ -32,6 +32,12 @@ logging:
     org.hibernate: INFO
 
 ead:
+  serviceRegistry: #autenticar no eureka quando tem spring security
+    username: serviceregistry
+    password: '123ead'
+  auth: #token jwt que tem duracao de 4 horas
+    jwtSecret: t7w!z%C*F-JaNdRgUkXp2s5v8x/A?D(G+KbPeShVmYq3t6w9z$B&E)H@McQfTjWn
+    jwtExpirationMs: 14400000
   api:
     url: #name eureka do course
       course: 'http://ead-course-service/ead-course'
@@ -39,10 +45,18 @@ ead:
     exchange:
       userEvent: ead.userevent #exchange da mensageria
 
+  management: #actuator
+    endpoints:
+      web:
+        exposure:
+          include:
+            -refresh
+            -health
+
 eureka: #configuracoes do eureka
   client:
     service-url:
-      defaultZone: 'http://localhost:8761/eureka'
+      defaultZone: 'http://${ead.serviceRegistry.username}:${ead.serviceRegistry.password}@localhost:8761/eureka'
   instance:
     hostname: localhost
 

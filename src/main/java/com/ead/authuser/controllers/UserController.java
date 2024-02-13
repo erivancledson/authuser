@@ -1,5 +1,7 @@
 package com.ead.authuser.controllers;
 
+import com.ead.authuser.configs.security.AuthenticationCurrentUserService;
+import com.ead.authuser.configs.security.UserDetailsImpl;
 import com.ead.authuser.models.UserModel;
 import com.ead.authuser.services.UserService;
 import com.ead.authuser.specifications.SpecificationTemplate;
@@ -13,6 +15,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,9 +39,17 @@ public class UserController {
     @Autowired
     UserService userService;
 
+    @Autowired
+    AuthenticationCurrentUserService authenticationCurrent;
+
+    @PreAuthorize("hasAnyRole('ADMIN')")
     @GetMapping //ordena por id do usuario de forma crescente
-    public ResponseEntity<Page<UserModel>> getAllUsers( SpecificationTemplate.UserSpec spec,
-            @PageableDefault(page = 0, size = 10, sort = "userId", direction = Sort.Direction.ASC) Pageable pageable){
+    public ResponseEntity<Page<UserModel>> getAllUsers(SpecificationTemplate.UserSpec spec,
+                                                       @PageableDefault(page = 0, size = 10, sort = "userId", direction = Sort.Direction.ASC) Pageable pageable,
+                                                       Authentication authentication){ //acesso o autentication que foi incluido dentro do contexto do spring security
+
+        UserDetails userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        log.info("Authentication {}", userDetails.getUsername()); //nome do usuario autenticado
 
         Page<UserModel> userModelPage = userService.findAll(spec, pageable);
 
@@ -47,13 +61,21 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.OK).body(userModelPage);
     }
 
+    @PreAuthorize("hasAnyRole('STUDENT')")
     @GetMapping("/{userId}")
     public ResponseEntity<Object> getOneUser(@PathVariable(value = "userId") UUID userId){
-        Optional<UserModel> userModelOptional = userService.findById(userId);
-        if(!userModelOptional.isPresent()){ //se estiver vazio
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
-        } else {
-            return ResponseEntity.status(HttpStatus.OK).body(userModelOptional.get()); //como ele utiliza o optional tem que colocar o .get()
+
+        UUID currentUserId = authenticationCurrent.getCurrentUser().getUserId(); //verifica se ele possui o mesmo id do id passado por parametro
+
+        if(currentUserId.equals(userId)) {
+            Optional<UserModel> userModelOptional = userService.findById(userId);
+            if (!userModelOptional.isPresent()) { //se estiver vazio
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+            } else {
+                return ResponseEntity.status(HttpStatus.OK).body(userModelOptional.get()); //como ele utiliza o optional tem que colocar o .get()
+            }
+        }else{
+            throw new AccessDeniedException("Forbidden");
         }
     }
 
